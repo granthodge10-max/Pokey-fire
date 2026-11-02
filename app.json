@@ -19,6 +19,13 @@
     },
     "plugins": [
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Pokey Fire uses the camera to scan and identify your Pokémon cards.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-image-picker",
         {
           "photosPermission": "Pokey Fire uses photos to add Pok\u00e9mon card pictures.",

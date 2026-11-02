@@ -1,48 +1,212 @@
-import React,{useEffect,useState} from 'react';
-import {SafeAreaView,View,Text,TextInput,TouchableOpacity,ScrollView,StyleSheet,Alert,Image,Switch} from 'react-native';
-import {StatusBar} from 'expo-status-bar';
-import * as ImagePicker from 'expo-image-picker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {Ionicons} from '@expo/vector-icons';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
+import { api } from './src/api';
+import CardDetail from './src/CardDetail';
+import { addToCollection, loadState, refreshPrices, saveState } from './src/collection';
+import CollectionScreen from './src/screens/CollectionScreen';
+import ScanScreen from './src/screens/ScanScreen';
+import SearchScreen from './src/screens/SearchScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import { ORANGE, palettes, ThemeContext } from './src/theme';
+import { Button, Panel, useStyles } from './src/ui';
 
-const KEY='pokey-fire-demo-v1', ORANGE='#ff5a1f';
-export default function App(){
- const [theme,setTheme]=useState('light'),[name,setName]=useState(''),[signed,setSigned]=useState(false),
- [cards,setCards]=useState([]),[priv,setPriv]=useState(false),[tab,setTab]=useState('Collection'),
- [search,setSearch]=useState(''),[card,setCard]=useState(''),[setName2,setSetName2]=useState(''),
- [raw,setRaw]=useState(''),[psa,setPsa]=useState(''),[photo,setPhoto]=useState(null),[loaded,setLoaded]=useState(false);
- const dark=theme==='dark', c=dark?{bg:'#090909',panel:'#171717',text:'#f5f5f5',muted:'#aaa',line:'#333',soft:'#28170f'}:{bg:'#fff',panel:'#f5f5f5',text:'#171717',muted:'#666',line:'#ddd',soft:'#fff0e9'};
- const s=StyleSheet.create({
-  safe:{flex:1,backgroundColor:c.bg},header:{padding:15,flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderBottomWidth:1,borderColor:c.line},
-  brand:{fontSize:24,fontWeight:'900',color:c.text},page:{padding:16,paddingBottom:35},hero:{backgroundColor:c.soft,borderWidth:1,borderColor:c.line,borderRadius:18,padding:18,marginBottom:14},
-  h1:{fontSize:28,fontWeight:'900',color:c.text,marginBottom:6},h2:{fontSize:21,fontWeight:'800',color:c.text,marginBottom:12},
-  text:{fontSize:15,color:c.text},muted:{fontSize:13,color:c.muted,lineHeight:19},panel:{backgroundColor:c.panel,borderWidth:1,borderColor:c.line,borderRadius:16,padding:15,marginBottom:12},
-  label:{color:c.text,fontWeight:'700',marginTop:7,marginBottom:5},input:{borderWidth:1,borderColor:c.line,backgroundColor:c.bg,color:c.text,padding:12,borderRadius:10,marginBottom:10},
-  btn:{backgroundColor:ORANGE,padding:12,borderRadius:11,alignItems:'center',justifyContent:'center',marginVertical:4,flexDirection:'row'},
-  btn2:{backgroundColor:c.panel,borderWidth:1,borderColor:c.line,padding:11,borderRadius:11,alignItems:'center',marginVertical:4},
-  btnText:{color:'#fff',fontWeight:'800'},btnText2:{color:c.text,fontWeight:'700'},tabs:{flexDirection:'row',flexWrap:'wrap',gap:6,marginBottom:14},
-  tab:{backgroundColor:c.panel,borderWidth:1,borderColor:c.line,borderRadius:10,paddingVertical:9,paddingHorizontal:10,flexGrow:1,alignItems:'center'},
-  active:{backgroundColor:ORANGE,borderColor:ORANGE},row:{flexDirection:'row',alignItems:'center',gap:10},
-  card:{flexDirection:'row',alignItems:'center',gap:12,borderWidth:1,borderColor:c.line,backgroundColor:c.panel,borderRadius:14,padding:10,marginBottom:9},
-  img:{width:68,height:90,borderRadius:8,backgroundColor:c.soft},notice:{padding:11,borderLeftWidth:4,borderLeftColor:ORANGE,backgroundColor:c.soft,borderRadius:8,marginVertical:10},
-  footer:{padding:9,borderTopWidth:1,borderColor:c.line,alignItems:'center'},center:{textAlign:'center',color:c.text}
- });
- useEffect(()=>{(async()=>{try{let v=await AsyncStorage.getItem(KEY);if(v){let d=JSON.parse(v);setTheme(d.theme||'light');setName(d.name||'');setSigned(!!d.name);setCards(d.cards||[]);setPriv(!!d.priv)}}catch(e){}setLoaded(true)})()},[]);
- useEffect(()=>{if(loaded)AsyncStorage.setItem(KEY,JSON.stringify({theme,name,cards,priv})).catch(()=>{})},[loaded,theme,name,cards,priv]);
- const button=(label,onPress,secondary=false)=> <TouchableOpacity onPress={onPress} style={secondary?s.btn2:s.btn}><Text style={secondary?s.btnText2:s.btnText}>{label}</Text></TouchableOpacity>;
- const field=(label,value,onChangeText,placeholder,kb)=> <View><Text style={s.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={c.muted} keyboardType={kb||'default'} autoCapitalize="none" style={s.input}/></View>;
- async function pick(camera){try{let p=camera?await ImagePicker.requestCameraPermissionsAsync():await ImagePicker.requestMediaLibraryPermissionsAsync();if(!p.granted){Alert.alert('Permission needed','Please allow camera or photo access.');return}let r=camera?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:.8}):await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:.8});if(!r.canceled)setPhoto(r.assets[0].uri)}catch(e){Alert.alert('Unavailable','Try this on a phone with Expo Go.')}} 
- function add(){if(!card.trim()){Alert.alert('Add a card name','Enter the Pokémon or card name.');return}setCards([{id:String(Date.now()),name:card.trim(),set:setName2,raw:Number(raw)||0,psa:Number(psa)||0,photo},...cards]);setCard('');setSetName2('');setRaw('');setPsa('');setPhoto(null);setTab('Collection')}
- if(!loaded)return <SafeAreaView style={s.safe}/>;
- return <SafeAreaView style={s.safe}><StatusBar style={dark?'light':'dark'}/>
- <View style={s.header}><Text style={s.brand}>🔥 Pokey Fire</Text><TouchableOpacity onPress={()=>setTheme(dark?'light':'dark')} style={s.btn2}><Text style={s.btnText2}>{dark?'☀ Light':'☾ Dark'}</Text></TouchableOpacity></View>
- {!signed?<ScrollView contentContainerStyle={s.page}><View style={s.hero}><Text style={{fontSize:40}}>🔥🎴</Text><Text style={s.h1}>Your cards. Your collection.</Text><Text style={s.muted}>Private app preview</Text></View><View style={s.panel}><Text style={s.h2}>Get started</Text>{field('Choose a username',name,setName,'e.g. CharizardFan99')}{button('Enter Pokey Fire',()=>{if(name.trim().length<3)Alert.alert('Choose a username','Use at least 3 characters.');else{setName(name.trim().replace(/^@/,''));setSigned(true)}})}<Text style={s.muted}>Demo sign-in only; secure account login is not connected yet.</Text></View><View style={s.notice}><Text style={s.text}>Planned subscription: $2 per week. No payments are enabled and no money will be charged.</Text></View></ScrollView>
- :<ScrollView contentContainerStyle={s.page}><View style={s.hero}><Text style={s.muted}>YOUR COLLECTOR PROFILE</Text><Text style={s.h1}>Hey, {name}!</Text><Text style={s.text}>{cards.length} cards · Estimated raw total: ${cards.reduce((a,x)=>a+(Number(x.raw)||0),0).toFixed(2)}</Text></View>
- <View style={s.tabs}>{['Collection','Add card','Search','Settings'].map(t=><TouchableOpacity key={t} onPress={()=>setTab(t)} style={[s.tab,tab===t&&s.active]}><Text style={{color:tab===t?'white':c.text,fontWeight:'700'}}>{t}</Text></TouchableOpacity>)}</View>
- {tab==='Collection'&&<View><Text style={s.h2}>My Collection</Text>{!cards.length?<View style={s.panel}><Text style={[s.text,s.center]}>🎴 Your collection is empty.</Text>{button('Add your first card',()=>setTab('Add card'))}</View>:cards.map(x=><View key={x.id} style={s.card}>{x.photo?<Image source={{uri:x.photo}} style={s.img}/>:<View style={[s.img,{alignItems:'center',justifyContent:'center'}]}><Text style={{fontSize:27}}>🎴</Text></View>}<View style={{flex:1}}><Text style={[s.text,{fontWeight:'800'}]}>{x.name}</Text><Text style={s.muted}>{x.set||'Set not entered'}</Text><Text style={{color:ORANGE,fontWeight:'800'}}>Raw: ${x.raw.toFixed(2)}</Text><Text style={s.muted}>PSA 10: ${x.psa.toFixed(2)} (manual demo)</Text></View><TouchableOpacity onPress={()=>setCards(cards.filter(y=>y.id!==x.id))}><Ionicons name="trash-outline" size={20} color={c.muted}/></TouchableOpacity></View>)}</View>}
- {tab==='Add card'&&<View style={s.panel}><Text style={s.h2}>Add / Scan a card</Text><Text style={s.muted}>Take or choose a photo. Automatic card recognition is not connected yet.</Text><View style={s.row}>{button('Take photo',()=>pick(true))}{button('Choose photo',()=>pick(false),true)}</View>{photo?<Image source={{uri:photo}} style={{width:130,height:170,resizeMode:'contain',alignSelf:'center',margin:10}}/>:null}{field('Pokémon / card name',card,setCard,'e.g. Charizard')}{field('Set / card number',setName2,setSetName2,'e.g. Base Set #4')}{field('Raw price ($)',raw,setRaw,'0.00','decimal-pad')}{field('PSA 10 price ($)',psa,setPsa,'0.00','decimal-pad')}<View style={s.notice}><Text style={s.text}>Prices are manual demo entries, not live verified market prices.</Text></View>{button('Save to collection',add)}</View>}
- {tab==='Search'&&<View style={s.panel}><Text style={s.h2}>Search collectors</Text><Text style={s.muted}>This preview can only find your local demo profile.</Text>{field('Username',search,setSearch,'Search username')}{search.trim()&&name.toLowerCase().includes(search.trim().replace(/^@/,'').toLowerCase())?<View style={s.card}><Text style={{fontSize:28}}>🔥</Text><View><Text style={[s.text,{fontWeight:'800'}]}>@{name}</Text><Text style={s.muted}>{priv?'Private collection':`${cards.length} cards in local demo`}</Text></View></View>:<Text style={s.muted}>{search.trim()?'No matching demo account.':'Enter a username to search.'}</Text>}</View>}
- {tab==='Settings'&&<View style={s.panel}><Text style={s.h2}>Settings</Text><Text style={s.label}>Appearance</Text>{button(dark?'Switch to light mode':'Switch to dark mode',()=>setTheme(dark?'light':'dark'),true)}<View style={[s.row,{marginVertical:12}]}><View style={{flex:1}}><Text style={s.text}>Keep my collection private</Text><Text style={s.muted}>Local preview preference only</Text></View><Switch value={priv} onValueChange={setPriv} trackColor={{true:ORANGE}}/></View><View style={s.notice}><Text style={s.text}>Planned subscription: $2/week. Checkout is not connected; no charges occur.</Text></View>{button('Sign out',()=>Alert.alert('Sign out?','Your local demo collection stays saved.',[{text:'Cancel'},{text:'Sign out',onPress:()=>{setSigned(false);setName('')}}]),true)}<Text style={s.muted}>Public launch still needs secure accounts, database, real card recognition/pricing, billing, privacy controls, and store review.</Text></View>}
- </ScrollView>}
- <View style={s.footer}><Text style={s.muted}>Pokey Fire · Preview build · Not affiliated with Pokémon or Nintendo</Text></View></SafeAreaView>
+const TABS = [
+  { key: 'collection', label: 'Collection', icon: 'albums' },
+  { key: 'scan', label: 'Scan', icon: 'scan' },
+  { key: 'search', label: 'Search', icon: 'search' },
+  { key: 'settings', label: 'Settings', icon: 'settings' },
+];
+
+const styles = (c) => ({
+  safe: { flex: 1, backgroundColor: c.bg },
+  header: { paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderColor: c.line },
+  brand: { fontSize: 22, fontWeight: '900', color: c.text },
+  body: { flex: 1, width: '100%', maxWidth: 1100, alignSelf: 'center' },
+  tabs: { flexDirection: 'row', borderTopWidth: 1, borderColor: c.line, backgroundColor: c.bg },
+  tab: { flex: 1, alignItems: 'center', paddingVertical: 8, gap: 2 },
+  tabLabel: { fontSize: 11, fontWeight: '700' },
+  toast: { position: 'absolute', left: 16, right: 16, bottom: 76, backgroundColor: c.text, borderRadius: 12, padding: 12, alignItems: 'center' },
+  toastText: { color: c.bg, fontWeight: '700' },
+  page: { padding: 16, gap: 14, maxWidth: 520, width: '100%', alignSelf: 'center' },
+  hero: { backgroundColor: c.soft, borderWidth: 1, borderColor: c.line, borderRadius: 18, padding: 20, gap: 6 },
+  h1: { fontSize: 30, fontWeight: '900', color: c.text },
+  h2: { fontSize: 19, fontWeight: '800', color: c.text, marginBottom: 8 },
+  muted: { fontSize: 13, color: c.muted, lineHeight: 19 },
+  input: { borderWidth: 1, borderColor: c.line, backgroundColor: c.bg, color: c.text, padding: 12, borderRadius: 10, marginBottom: 10, fontSize: 16 },
+});
+
+function Welcome({ onStart }) {
+  const s = useStyles(styles);
+  const [name, setName] = useState('');
+  const [error, setError] = useState(null);
+  const start = () => {
+    const n = name.trim().replace(/^@/, '');
+    if (n.length < 3) setError('Use at least 3 characters.');
+    else onStart(n);
+  };
+  return (
+    <ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled">
+      <View style={s.hero}>
+        <Text style={{ fontSize: 40 }}>🔥🎴</Text>
+        <Text style={s.h1}>Scan it. Know what it’s worth.</Text>
+        <Text style={s.muted}>Point your camera at a Pokémon card to identify it, see its market price and add it to your digital collection.</Text>
+      </View>
+      <Panel>
+        <Text style={s.h2}>Get started</Text>
+        <TextInput value={name} onChangeText={setName} onSubmitEditing={start} placeholder="Choose a username" placeholderTextColor="#999" autoCapitalize="none" style={s.input} />
+        {error ? <Text style={[s.muted, { color: ORANGE, marginBottom: 8 }]}>{error}</Text> : null}
+        <Button label="Enter Pokey Fire" onPress={start} />
+        <Text style={[s.muted, { marginTop: 8 }]}>Your collection is stored on this device. Secure accounts are coming later.</Text>
+      </Panel>
+    </ScrollView>
+  );
+}
+
+function Shell({ state, update }) {
+  const s = useStyles(styles);
+  const { c, dark } = React.useContext(ThemeContext);
+  const [tab, setTab] = useState(state.items.length ? 'collection' : 'scan');
+  const [detail, setDetail] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+
+  const notify = useCallback((msg) => {
+    setToast(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2500);
+  }, []);
+
+  const add = useCallback(
+    (card, variantKey) => {
+      update((st) => ({ ...st, items: addToCollection(st.items, card, variantKey) }));
+      notify(`Added ${card.name} to your collection`);
+    },
+    [update, notify],
+  );
+
+  const updateItem = (item) => {
+    update((st) => ({ ...st, items: st.items.map((i) => (i.id === item.id ? item : i)) }));
+    setDetail((d) => (d?.item ? { ...d, item } : d));
+  };
+  const removeItem = (item) => {
+    update((st) => ({ ...st, items: st.items.filter((i) => i.id !== item.id) }));
+    setDetail(null);
+    notify(`Removed ${item.name}`);
+  };
+
+  async function refresh() {
+    setRefreshing(true);
+    try {
+      const { items, failed } = await refreshPrices(state.items, api.card);
+      update((st) => ({ ...st, items, lastRefresh: new Date().toISOString() }));
+      notify(failed ? `Updated prices (${failed} couldn’t be reached)` : 'Prices updated');
+    } catch (e) {
+      notify(e.message);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  return (
+    <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+      <StatusBar style={dark ? 'light' : 'dark'} />
+      <View style={s.header}>
+        <Text style={s.brand}>🔥 Pokey Fire</Text>
+        <TouchableOpacity onPress={() => update((st) => ({ ...st, theme: dark ? 'light' : 'dark' }))} accessibilityLabel="Toggle dark mode">
+          <Ionicons name={dark ? 'sunny-outline' : 'moon-outline'} size={22} color={c.text} />
+        </TouchableOpacity>
+      </View>
+      <View style={s.body}>
+        {tab === 'collection' && (
+          <CollectionScreen
+            name={state.name}
+            items={state.items}
+            lastRefresh={state.lastRefresh}
+            refreshing={refreshing}
+            onRefresh={refresh}
+            onOpenItem={(item) => setDetail({ item, cardId: item.cardId })}
+            onScan={() => setTab('scan')}
+          />
+        )}
+        {tab === 'scan' && (
+          <ScanScreen onAdd={add} onOpenCard={(card, finishHint) => setDetail({ card, finishHint })} onSearchInstead={() => setTab('search')} />
+        )}
+        {tab === 'search' && <SearchScreen onOpenCard={(cardId) => setDetail({ cardId })} />}
+        {tab === 'settings' && (
+          <SettingsScreen
+            name={state.name}
+            dark={dark}
+            onToggleTheme={() => update((st) => ({ ...st, theme: dark ? 'light' : 'dark' }))}
+            priv={!!state.priv}
+            onTogglePrivate={(v) => update((st) => ({ ...st, priv: v }))}
+            onClearCollection={() => update((st) => ({ ...st, items: [], lastRefresh: null }))}
+            onSignOut={() => update((st) => ({ ...st, name: '' }))}
+          />
+        )}
+      </View>
+      {toast ? (
+        <View style={s.toast} pointerEvents="none">
+          <Text style={s.toastText}>{toast}</Text>
+        </View>
+      ) : null}
+      <View style={s.tabs}>
+        {TABS.map((t) => {
+          const on = tab === t.key;
+          return (
+            <TouchableOpacity key={t.key} style={s.tab} onPress={() => setTab(t.key)} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+              <Ionicons name={on ? t.icon : `${t.icon}-outline`} size={22} color={on ? ORANGE : c.muted} />
+              <Text style={[s.tabLabel, { color: on ? ORANGE : c.muted }]}>{t.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      {detail ? (
+        <CardDetail
+          key={detail.item?.id || detail.cardId || detail.card?.id}
+          {...detail}
+          onAdd={(card, variantKey) => {
+            add(card, variantKey);
+            setDetail(null);
+          }}
+          onUpdateItem={updateItem}
+          onRemoveItem={removeItem}
+          onClose={() => setDetail(null)}
+        />
+      ) : null}
+    </SafeAreaView>
+  );
+}
+
+export default function App() {
+  const [state, setState] = useState(null);
+
+  useEffect(() => {
+    loadState().then((saved) => setState({ theme: 'light', name: '', items: [], priv: false, lastRefresh: null, ...saved }));
+  }, []);
+  useEffect(() => {
+    if (state) saveState(state);
+  }, [state]);
+
+  const dark = state?.theme === 'dark';
+  const theme = React.useMemo(() => ({ c: dark ? palettes.dark : palettes.light, dark }), [dark]);
+
+  return (
+    <SafeAreaProvider>
+      <ThemeContext.Provider value={theme}>
+        {!state ? (
+          <View style={{ flex: 1, backgroundColor: theme.c.bg }} />
+        ) : state.name ? (
+          <Shell state={state} update={setState} />
+        ) : (
+          <SafeAreaView style={{ flex: 1, backgroundColor: theme.c.bg }}>
+            <Welcome onStart={(name) => setState((st) => ({ ...st, name }))} />
+          </SafeAreaView>
+        )}
+      </ThemeContext.Provider>
+    </SafeAreaProvider>
+  );
 }
